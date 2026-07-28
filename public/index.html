@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منظومة استعلام نتائج الطلاب - 2026</title>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="container header-content">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>منظومة استعلام نتائج الطلاب</h1>
+                    <p>قاعدة بيانات شاملة تغطي أكثر من 919,000 طالب وطالبة</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn-icon" id="themeToggle" title="تغيير المظهر">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+                <button class="btn-primary" id="exportBtn" title="تصدير النتائج كملف CSV">
+                    <i class="fa-solid fa-file-csv"></i>
+                    <span>تصدير البيانات</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container">
+
+        <!-- KPI Stats Dashboard -->
+        <section class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-icon blue">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+                <div class="kpi-info">
+                    <h3 id="statTotal">919,396</h3>
+                    <p>إجمالي الطلاب المقيدين</p>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-icon green">
+                    <i class="fa-solid fa-user-check"></i>
+                </div>
+                <div class="kpi-info">
+                    <h3 id="statPassRate">70.8%</h3>
+                    <p>نسبة النجاح العامة (دور أول)</p>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-icon purple">
+                    <i class="fa-solid fa-award"></i>
+                </div>
+                <div class="kpi-info">
+                    <h3 id="statAvgDegree">198.9 / 320</h3>
+                    <p>متوسط درجات الطلاب</p>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-icon amber">
+                    <i class="fa-solid fa-user-clock"></i>
+                </div>
+                <div class="kpi-info">
+                    <h3 id="statSecondRound">210,511</h3>
+                    <p>طلاب دور ثانٍ</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Search & Filter Card -->
+        <section class="search-card">
+            <div class="search-bar-row">
+                <div class="search-input-wrapper">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="searchInput" class="search-input" placeholder="ابحث برقم الجلوس أو اسم الطالب كامل أو جزئي..." autocomplete="off">
+                </div>
+            </div>
+
+            <div class="filters-row">
+                <!-- Status Filter Pills -->
+                <div class="status-pills" id="statusFilterPills">
+                    <button class="pill-btn active" data-status="ALL">الكل</button>
+                    <button class="pill-btn" data-status="ناجح دور أول">ناجح دور أول</button>
+                    <button class="pill-btn" data-status="دور ثان">دور ثان</button>
+                    <button class="pill-btn" data-status="راسب دور أول">راسب دور أول</button>
+                    <button class="pill-btn" data-status="غياب كلى دور أول">غياب كلى</button>
+                </div>
+
+                <!-- Sort & Limit Controls -->
+                <div class="filter-controls">
+                    <label for="sortBySelect" style="font-size: 13px; color: var(--text-muted);">ترتيب حسب:</label>
+                    <select id="sortBySelect" class="select-control">
+                        <option value="seating_no-ASC">رقم الجلوس (تصاعدي)</option>
+                        <option value="seating_no-DESC">رقم الجلوس (تنازلي)</option>
+                        <option value="total_degree-DESC">المجموع (الأعلى أولاً)</option>
+                        <option value="total_degree-ASC">المجموع (الأقل أولاً)</option>
+                        <option value="arabic_name-ASC">اسم الطالب (أ - ي)</option>
+                    </select>
+
+                    <label for="limitSelect" style="font-size: 13px; color: var(--text-muted);">عرض:</label>
+                    <select id="limitSelect" class="select-control">
+                        <option value="25">25 سجل</option>
+                        <option value="50">50 سجل</option>
+                        <option value="100">100 سجل</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Table Section -->
+        <section class="results-card">
+            <div class="table-header-meta">
+                <div>
+                    <span style="font-weight: 700;">نتائج البحث:</span>
+                    <span id="resultsCountText" style="color: var(--primary); font-weight: 800; margin-right: 6px;">جاري التحميل...</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted);" id="pageMetaText">
+                    صفحة 1 من 1
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>رقم الجلوس</th>
+                            <th>اسم الطالب</th>
+                            <th>المجموع الكلي</th>
+                            <th>النسبة المئوية</th>
+                            <th>حالة الطالب</th>
+                            <th>خيارات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsTableBody">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="loadingSpinner" class="spinner" style="display: none;"></div>
+
+            <!-- Pagination Bar -->
+            <div class="pagination-container">
+                <div style="font-size: 13px; color: var(--text-muted);" id="paginationInfoText">
+                    عرض 1 - 25 من إجمالي النتائج
+                </div>
+                <div class="pagination-controls" id="paginationControls">
+                    <!-- Pagination buttons -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Student Details / Certificate Modal -->
+    <div class="modal-backdrop" id="studentModal">
+        <div class="modal-card">
+            <button class="close-modal" id="closeModalBtn">&times;</button>
+            <div id="printableCard">
+                <div style="text-align: center; margin-bottom: 24px;">
+                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #38bdf8, #6366f1); border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; color: white; font-size: 30px; margin-bottom: 12px;">
+                        <i class="fa-solid fa-certificate"></i>
+                    </div>
+                    <h2 style="font-size: 20px; font-weight: 800;">بطاقة نتيجة طالب</h2>
+                    <p style="font-size: 13px; color: var(--text-muted);">العام الدراسي 2026 - الكنترول المركزي</p>
+                </div>
+
+                <div style="background: rgba(15, 23, 42, 0.3); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px dashed var(--border-color); padding-bottom: 10px;">
+                        <span style="color: var(--text-muted);">اسم الطالب:</span>
+                        <strong id="modalName" style="font-size: 16px; color: var(--primary);">-</strong>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px dashed var(--border-color); padding-bottom: 10px;">
+                        <span style="color: var(--text-muted);">رقم الجلوس:</span>
+                        <strong id="modalSeating" style="font-family: monospace; font-size: 16px;">-</strong>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px dashed var(--border-color); padding-bottom: 10px;">
+                        <span style="color: var(--text-muted);">المجموع الكلي:</span>
+                        <strong id="modalDegree" style="font-size: 16px;">- / 320</strong>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px dashed var(--border-color); padding-bottom: 10px;">
+                        <span style="color: var(--text-muted);">النسبة المئوية:</span>
+                        <strong id="modalPercentage" style="font-size: 16px; color: var(--success);">- %</strong>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--text-muted);">حالة الطالب:</span>
+                        <span id="modalStatus" class="status-tag pass">-</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button class="btn-primary" id="printCertBtn">
+                        <i class="fa-solid fa-print"></i>
+                        <span>طباعة الشهادة</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
