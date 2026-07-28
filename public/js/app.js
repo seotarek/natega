@@ -1,4 +1,4 @@
-// Student Results Web Application JS Logic
+// Student Results Web Application JS Logic (Dual-Mode: Backend API & Standalone GitHub Pages)
 document.addEventListener('DOMContentLoaded', () => {
     
     // State variables
@@ -9,6 +9,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentOrder = 'ASC';
     let currentLimit = 25;
     let debounceTimer = null;
+
+    // Static mode variables
+    let isStaticMode = false;
+    let staticStats = null;
+    let staticChunkIndex = null;
+    let staticNameIndex = null;
+    const chunkCache = new Map();
 
     // DOM Elements
     const searchInput = document.getElementById('searchInput');
@@ -54,13 +61,56 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 1. Fetch Stats on Load
-    fetchStats();
+    // Helper: Normalize Arabic Text
+    function normalizeArabic(text) {
+        if (!text) return '';
+        return text
+            .replace(/[أإآا]/g, 'ا')
+            .replace(/ة/g, 'ه')
+            .replace(/ى/g, 'ي')
+            .replace(/[\u064B-\u0652]/g, '')
+            .toLowerCase()
+            .trim();
+    }
 
-    // 2. Fetch Students Data
-    fetchStudents();
+    // Detect Environment & Initialize
+    async function initApp() {
+        try {
+            const apiCheck = await fetch('/api/stats', { method: 'GET' }).catch(() => null);
+            if (apiCheck && apiCheck.ok) {
+                isStaticMode = false;
+            } else {
+                isStaticMode = true;
+                await initStaticData();
+            }
+        } catch (e) {
+            isStaticMode = true;
+            await initStaticData();
+        }
 
-    // Search Input Event (Debounced 300ms)
+        fetchStats();
+        fetchStudents();
+    }
+
+    async function initStaticData() {
+        try {
+            const [statsRes, chunkIdxRes, nameIdxRes] = await Promise.all([
+                fetch('data/stats.json').catch(() => null),
+                fetch('data/chunk_index.json').catch(() => null),
+                fetch('data/name_index.json').catch(() => null)
+            ]);
+
+            if (statsRes && statsRes.ok) staticStats = await statsRes.json();
+            if (chunkIdxRes && chunkIdxRes.ok) staticChunkIndex = await chunkIdxRes.json();
+            if (nameIdxRes && nameIdxRes.ok) staticNameIndex = await nameIdxRes.json();
+        } catch (err) {
+            console.warn('Error loading static indexes:', err);
+        }
+    }
+
+    initApp();
+
+    // Event Listeners
     searchInput.addEventListener('input', (e) => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
@@ -70,7 +120,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 300);
     });
 
-    // Status Pill Filter Event
     statusPills.addEventListener('click', (e) => {
         const btn = e.target.closest('.pill-btn');
         if (!btn) return;
@@ -83,7 +132,6 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchStudents();
     });
 
-    // Sort By Change Event
     sortBySelect.addEventListener('change', (e) => {
         const [sort, order] = e.target.value.split('-');
         currentSortBy = sort;
@@ -92,79 +140,82 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchStudents();
     });
 
-    // Limit Change Event
     limitSelect.addEventListener('change', (e) => {
         currentLimit = parseInt(e.target.value) || 25;
         currentPage = 1;
         fetchStudents();
     });
 
-    // Export CSV Event
     exportBtn.addEventListener('click', () => {
-        const params = new URLSearchParams({
-            query: currentQuery,
-            status: currentStatus
-        });
-        window.location.href = `/api/export?${params.toString()}`;
-    });
-
-    // Modal Close
-    closeModalBtn.addEventListener('click', () => {
-        studentModal.classList.remove('show');
-    });
-
-    studentModal.addEventListener('click', (e) => {
-        if (e.target === studentModal) {
-            studentModal.classList.remove('show');
+        if (!isStaticMode) {
+            const params = new URLSearchParams({ query: currentQuery, status: currentStatus });
+            window.location.href = `/api/export?${params.toString()}`;
+        } else {
+            alert('العمل حالياً في النمط الإستاتيكي (GitHub Pages). يمكنك استخدام الجدول والبحث بشكل مباشر.');
         }
     });
 
-    printCertBtn.addEventListener('click', () => {
-        window.print();
-    });
+    closeModalBtn.addEventListener('click', () => studentModal.classList.remove('show'));
+    studentModal.addEventListener('click', (e) => { if (e.target === studentModal) studentModal.classList.remove('show'); });
+    printCertBtn.addEventListener('click', () => window.print());
 
-    // Fetch Stats function
+    // Fetch Stats
     async function fetchStats() {
-        try {
-            const res = await fetch('/api/stats');
-            const data = await res.json();
-            if (data.success) {
-                const s = data.stats;
-                document.getElementById('statTotal').innerText = Number(s.totalStudents).toLocaleString('ar-EG');
-                document.getElementById('statPassRate').innerText = `${s.passRate}%`;
-                document.getElementById('statAvgDegree').innerText = `${s.avgDegree} / 320`;
-                
-                const secRoundObj = s.statusBreakdown.find(x => x.status === 'دور ثان');
-                if (secRoundObj) {
-                    document.getElementById('statSecondRound').innerText = Number(secRoundObj.count).toLocaleString('ar-EG');
+        if (!isStaticMode) {
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                if (data.success) {
+                    const s = data.stats;
+                    document.getElementById('statTotal').innerText = Number(s.totalStudents).toLocaleString('ar-EG');
+                    document.getElementById('statPassRate').innerText = `${s.passRate}%`;
+                    document.getElementById('statAvgDegree').innerText = `${s.avgDegree} / 320`;
+                    const secRoundObj = s.statusBreakdown.find(x => x.status === 'دور ثان');
+                    if (secRoundObj) document.getElementById('statSecondRound').innerText = Number(secRoundObj.count).toLocaleString('ar-EG');
                 }
+            } catch (err) {
+                console.error('Error loading stats:', err);
             }
-        } catch (err) {
-            console.error('Error loading stats:', err);
+        } else if (staticStats) {
+            document.getElementById('statTotal').innerText = Number(staticStats.totalStudents).toLocaleString('ar-EG');
+            document.getElementById('statPassRate').innerText = `${staticStats.passRate}%`;
+            document.getElementById('statAvgDegree').innerText = `${staticStats.avgDegree} / 320`;
+            document.getElementById('statSecondRound').innerText = '210,511';
         }
     }
 
-    // Fetch Students function
+    // Fetch Students
     async function fetchStudents() {
         loadingSpinner.style.display = 'block';
         resultsTableBody.style.opacity = '0.5';
 
         try {
-            const params = new URLSearchParams({
-                query: currentQuery,
-                status: currentStatus,
-                sortBy: currentSortBy,
-                order: currentOrder,
-                page: currentPage,
-                limit: currentLimit
-            });
-
-            const res = await fetch(`/api/students?${params.toString()}`);
-            const json = await res.json();
-
-            if (json.success) {
-                renderTable(json.data, json.page, json.limit);
-                renderPagination(json.total, json.page, json.limit, json.totalPages);
+            if (!isStaticMode) {
+                const params = new URLSearchParams({
+                    query: currentQuery,
+                    status: currentStatus,
+                    sortBy: currentSortBy,
+                    order: currentOrder,
+                    page: currentPage,
+                    limit: currentLimit
+                });
+                const res = await fetch(`/api/students?${params.toString()}`);
+                const json = await res.json();
+                if (json.success) {
+                    renderTable(json.data, json.page, json.limit);
+                    renderPagination(json.total, json.page, json.limit, json.totalPages);
+                }
+            } else {
+                // Static Client Search
+                const results = await performStaticSearch();
+                const total = results.length;
+                const totalPages = Math.ceil(total / currentLimit) || 1;
+                const pageNum = Math.max(1, Math.min(currentPage, totalPages));
+                const start = (pageNum - 1) * currentLimit;
+                const pageData = results.slice(start, start + currentLimit);
+                
+                renderTable(pageData, pageNum, currentLimit);
+                renderPagination(total, pageNum, currentLimit, totalPages);
             }
         } catch (err) {
             console.error('Error loading students:', err);
@@ -173,6 +224,91 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingSpinner.style.display = 'none';
             resultsTableBody.style.opacity = '1';
         }
+    }
+
+    // Perform Static Search
+    async function performStaticSearch() {
+        let matchingChunks = [];
+        const cleanQ = currentQuery.trim();
+
+        if (cleanQ) {
+            if (/^\d+$/.test(cleanQ)) {
+                // Seating number search
+                const seatNum = intVal(cleanQ);
+                if (staticChunkIndex) {
+                    matchingChunks = staticChunkIndex.filter(c => seatNum >= c.min_seating && seatNum <= c.max_seating).map(c => c.id);
+                    if (matchingChunks.length === 0) {
+                        matchingChunks = staticChunkIndex.filter(c => String(c.min_seating).startsWith(cleanQ)).map(c => c.id).slice(0, 3);
+                    }
+                }
+            } else {
+                // Name search
+                const norm = normalizeArabic(cleanQ);
+                const words = norm.split(' ');
+                let chunkSet = new Set();
+
+                if (staticNameIndex) {
+                    const key = words.slice(0, 2).join(' ');
+                    if (staticNameIndex[key]) {
+                        staticNameIndex[key].forEach(id => chunkSet.add(id));
+                    } else if (staticNameIndex[words[0]]) {
+                        staticNameIndex[words[0]].forEach(id => chunkSet.add(id));
+                    }
+                }
+
+                if (chunkSet.size > 0) {
+                    matchingChunks = Array.from(chunkSet).slice(0, 5);
+                } else {
+                    matchingChunks = [0, 1, 2]; // Fallback to first few chunks
+                }
+            }
+        } else {
+            matchingChunks = [0]; // Default to chunk 0
+        }
+
+        if (matchingChunks.length === 0) matchingChunks = [0];
+
+        // Fetch required chunks
+        let allRows = [];
+        for (const chunkId of matchingChunks) {
+            let rows = chunkCache.get(chunkId);
+            if (!rows) {
+                try {
+                    const r = await fetch(`data/chunks/${chunkId}.json`);
+                    if (r.ok) {
+                        rows = await r.json();
+                        chunkCache.set(chunkId, rows);
+                    }
+                } catch (e) {}
+            }
+            if (rows) {
+                rows.forEach(r => {
+                    allRows.push({
+                        seating_no: r[0],
+                        arabic_name: r[1],
+                        total_degree: r[2],
+                        student_case_desc: r[3]
+                    });
+                });
+            }
+        }
+
+        // Apply filters in memory
+        return allRows.filter(r => {
+            if (currentStatus !== 'ALL' && r.student_case_desc !== currentStatus) return false;
+            if (cleanQ) {
+                if (/^\d+$/.test(cleanQ)) {
+                    return r.seating_no.startsWith(cleanQ);
+                } else {
+                    return normalizeArabic(r.arabic_name).includes(normalizeArabic(cleanQ));
+                }
+            }
+            return true;
+        });
+    }
+
+    function intVal(v) {
+        return parseInt(v) || 0;
     }
 
     // Render Table Rows
@@ -194,14 +330,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const pct = ((degree / maxDeg) * 100).toFixed(1);
             const status = row.student_case_desc;
 
-            // Score badge color
             let scoreClass = 'mid';
             if (pct >= 85) scoreClass = 'high';
             else if (pct >= 75) scoreClass = 'mid';
             else if (pct >= 50) scoreClass = 'low';
             else scoreClass = 'fail';
 
-            // Status tag color
             let statusClass = 'pass';
             if (status.includes('دور ثان')) statusClass = 'second-round';
             else if (status.includes('راسب')) statusClass = 'failed';
@@ -231,7 +365,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         resultsTableBody.innerHTML = html;
 
-        // Attach modal triggers
         document.querySelectorAll('.view-student-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const s = JSON.parse(btn.dataset.student);
@@ -240,7 +373,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Open Modal Details
     function openStudentModal(s) {
         const degree = parseFloat(s.total_degree) || 0;
         const pct = ((degree / 320) * 100).toFixed(1);
@@ -261,7 +393,6 @@ document.addEventListener('DOMContentLoaded', () => {
         studentModal.classList.add('show');
     }
 
-    // Highlight Query Matches
     function highlightText(text, query) {
         if (!query || query.trim() === '' || /^\d+$/.test(query.trim())) return text;
         const q = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -269,7 +400,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return text.replace(regex, `<mark style="background: rgba(245, 158, 11, 0.35); color: #fef08a; padding: 2px 4px; border-radius: 4px;">$1</mark>`);
     }
 
-    // Render Pagination Controls
     function renderPagination(total, page, limit, totalPages) {
         resultsCountText.innerText = `${Number(total).toLocaleString('ar-EG')} طالب`;
         pageMetaText.innerText = `صفحة ${page} من ${Number(totalPages).toLocaleString('ar-EG')}`;
@@ -279,17 +409,11 @@ document.addEventListener('DOMContentLoaded', () => {
         paginationInfoText.innerText = `عرض ${startIdx} - ${endIdx} من إجمالي ${Number(total).toLocaleString('ar-EG')}`;
 
         let html = '';
-
-        // Previous button
         html += `<button class="page-btn" ${page <= 1 ? 'disabled' : ''} data-page="${page - 1}"><i class="fa-solid fa-chevron-right"></i> السابقة</button>`;
 
-        // Page numbers logic (Max 5 page buttons shown)
         let startPage = Math.max(1, page - 2);
         let endPage = Math.min(totalPages, startPage + 4);
-
-        if (endPage - startPage < 4) {
-            startPage = Math.max(1, endPage - 4);
-        }
+        if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
 
         if (startPage > 1) {
             html += `<button class="page-btn" data-page="1">1</button>`;
@@ -305,12 +429,10 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `<button class="page-btn" data-page="${totalPages}">${totalPages}</button>`;
         }
 
-        // Next button
         html += `<button class="page-btn" ${page >= totalPages ? 'disabled' : ''} data-page="${page + 1}">التالية <i class="fa-solid fa-chevron-left"></i></button>`;
 
         paginationControls.innerHTML = html;
 
-        // Attach pagination click handlers
         paginationControls.querySelectorAll('.page-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 if (btn.hasAttribute('disabled')) return;
